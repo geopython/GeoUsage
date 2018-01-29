@@ -63,13 +63,14 @@ GeoUsage mailing_list member_count
 ```
 
 ### Using the API
+
 ```python
 from GeoUsage.mailman import MailmanAdmin
 
 ma = MailmanAdmin('http://example.org/mailman/admin/list', 'secret')
 print(ma.member_count)
 
-```k
+```
 
 ## Development
 
