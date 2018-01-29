@@ -20,9 +20,9 @@ install:
 script:
   - python setup.py test
   - find . -type f -name "*.py" | xargs flake8
-  - python setup.py --long-description | rst2html5.py
 
 after_success:
+  - python setup.py --long-description | rst2html5.py
   - coverage run --source=GeoUsage -m unittest GeoUsage.tests.run_tests
   - coverage report -m
   - coveralls
