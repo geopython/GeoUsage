@@ -1,0 +1,11 @@
+[run]
+source=GeoUsage
+
+[report]
+exclude_lines =
+#    pragma: no cover
+#    if __name__ == .__main__.:
+    def __repr__
+    def cli    
+omit =
+    GeoUsage/tests/*
