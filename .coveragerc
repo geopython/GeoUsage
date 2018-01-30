@@ -7,5 +7,9 @@ exclude_lines =
 #    if __name__ == .__main__.:
     def __repr__
     def cli    
+    def log
+    def analyze
+    def mailing_list
+    def member_count
 omit =
     GeoUsage/tests/*

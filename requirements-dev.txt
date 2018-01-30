@@ -4,6 +4,8 @@ flake8
 pypandoc
 twine
 wheel
+mock  # for Python 2 testing
+
 
 # the packages below are used to handle HTTP/SSL
 # errors when uploading to PyPI (https://github.com/pypa/twine/issues/273)

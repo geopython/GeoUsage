@@ -27,7 +27,14 @@ from datetime import datetime
 import os
 import unittest
 
-from GeoUsage.log import Analyzer, WMSLogRecord
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch
+
+
+from GeoUsage.log import Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord
+from GeoUsage.mailing_list import MailmanAdmin
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -44,8 +51,11 @@ class LogTest(unittest.TestCase):
 
         with open(access_log) as ff:
             for line in ff.readlines():
-                lr = WMSLogRecord(line)
-                records.append(lr)
+                try:
+                    lr = WMSLogRecord(line)
+                    records.append(lr)
+                except NotFoundError:
+                    pass
 
         self.assertEqual(len(records), 340)
 
@@ -84,8 +94,11 @@ class AnalyzerTest(unittest.TestCase):
 
         with open(access_log) as ff:
             for line in ff.readlines():
-                lr = WMSLogRecord(line)
-                records.append(lr)
+                try:
+                    lr = WMSLogRecord(line)
+                    records.append(lr)
+                except NotFoundError:
+                    pass
 
         self.assertEqual(len(records), 340)
 
@@ -95,6 +108,27 @@ class AnalyzerTest(unittest.TestCase):
         self.assertEqual(a.end, datetime(2018, 1, 26, 22, 42, 12))
         self.assertEqual(a.total_requests, 339)
         self.assertEqual(a.total_size, 882128934)
+        self.assertEqual(len(a.unique_ips), 8)
+
+        with self.assertRaises(NotFoundError):
+            with open(access_log) as ff:
+                for line in ff.readlines():
+                    lr = OWSLogRecord(line, service_type='OGC:WFS')
+
+
+class MailmanAdminTest(unittest.TestCase):
+    """Test case for GeoUsage.mailing_list.MailmanAdmin"""
+
+    @patch('requests.post')
+    def test_member_count(self, mock_get):
+        """test mailing list member count"""
+
+        mock_get.return_value.ok = True
+        mock_get.return_value.text = '18 members total'
+
+        ma = MailmanAdmin('http://example.org/mailmain/admin/list', 'secret')
+
+        self.assertEqual(ma.member_count, 18)
 
 
 def get_abspath(filepath):

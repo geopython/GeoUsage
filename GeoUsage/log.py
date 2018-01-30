@@ -32,6 +32,11 @@ import click
 
 LOGGER = logging.getLogger(__name__)
 
+SERVICE_TYPES = {
+    'OGC:WMS': 'WMS',
+    'OGC:WFS': 'WFS'
+}
+
 
 class LogRecord(object):
     """Generic Log Record"""
@@ -126,7 +131,14 @@ class OWSLogRecord(LogRecord):
         LogRecord.__init__(self, line)
 
         LOGGER.debug('Splitting OWS request line')
-        self.baseurl, _kvps = self.request.split('?')
+
+        try:
+            self.baseurl, _kvps = self.request.split('?')
+        except ValueError:
+            msg = 'Non OWS URL'
+            LOGGER.warning(msg)
+            raise NotFoundError(msg)
+
         for _kvp in _kvps.split('&'):
             LOGGER.debug('keyword/value pair: {}'.format(_kvp))
             if '=' in _kvp:
@@ -140,11 +152,14 @@ class OWSLogRecord(LogRecord):
         if 'request' in self.kvp:
             self.ows_request = self.kvp['request']
 
-        if service_type is not None:
-            if self.service is not None and service_type != self.service:
-                msg = 'Service type {} not found'.format(service_type)
-                LOGGER.exception(msg)
-                raise NotFound(msg)
+#        if service_type is not None:
+#            if service_type in SERVICE_TYPES:
+#                service_type_ = SERVICE_TYPES[service_type]
+#                print(self.service, service_type_)
+#                if self.service is not None and service_type_ != self.service:
+#                    msg = 'Service type {} not found'.format(service_type_)
+#                    LOGGER.warning(msg)
+#                    raise NotFoundError(msg)
 
 
 class WMSLogRecord(OWSLogRecord):
@@ -161,11 +176,7 @@ class WMSLogRecord(OWSLogRecord):
         self.resource = 'layers'
         """WMS parameter to identify resource"""
 
-        try:
-            OWSLogRecord.__init__(self, line, service_type='OGC:WMS')
-        except NotFound as err:
-            LOGGER.error(err)
-            return None
+        OWSLogRecord.__init__(self, line, service_type='OGC:WMS')
 
 
 class Analyzer(object):
@@ -192,6 +203,9 @@ class Analyzer(object):
 
         self.total_size = 0
         """total transfer (bytes)"""
+
+        self.unique_ips = []
+        """unique visitors"""
 
         self.resources = {}
         """resources requested and counts"""
@@ -221,6 +235,7 @@ class Analyzer(object):
             else:
                 self.user_agents[r.user_agent] = 1
 
+            LOGGER.debug('Analyzing data usage')
             if r.resource in r.kvp:
                 resource_name = r.kvp[r.resource]
                 if resource_name in self.resources:
@@ -228,14 +243,20 @@ class Analyzer(object):
                 else:
                     self.resources[resource_name] = 1
 
+            LOGGER.debug('Analyzing unique IP addresses')
+            if r.remote_host not in self.unique_ips:
+                self.unique_ips.append(r.remote_host)
+
+        LOGGER.debug('Analyzing total requests')
         self.total_requests = sum(item for item in self.requests.values())
+
         self.requests = sorted(self.requests.items(),
                                key=lambda x: x[1], reverse=True)
         self.resources = sorted(self.resources.items(),
                                 key=lambda x: x[1], reverse=True)
 
 
-class NotFound(Exception):
+class NotFoundError(Exception):
     """Value not found Exception"""
     pass
 
@@ -267,16 +288,20 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS'):
 
     with open(logfile) as ff:
         for line in ff.readlines():
-            r = WMSLogRecord(line)
-            records.append(r)
+            try:
+                r = WMSLogRecord(line)
+                records.append(r)
+            except NotFoundError:
+                pass
 
     a = Analyzer(records)
 
     click.echo('\nGeoUsage Analysis\n')
-    click.echo('Logfile: {}'.format(logfile))
+    click.echo('Logfile: {}\n'.format(logfile))
     click.echo('Period: {} - {}\n'.format(a.start.isoformat(),
                                           a.end.isoformat()))
     click.echo('Total bytes transferred: {}\n'.format(a.total_size))
+    click.echo('Unique visitors: {}\n'.format(len(a.unique_ips)))
     click.echo('Requests breakdown ({}):'.format(a.total_requests))
     for req in a.requests:
         click.echo('    {}: {}'.format(req[0], req[1]))
