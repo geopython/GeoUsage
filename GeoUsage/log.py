@@ -161,6 +161,9 @@ class OWSLogRecord(LogRecord):
 #                    LOGGER.warning(msg)
 #                    raise NotFoundError(msg)
 
+    def __repr__(self):
+        return '<OWSLogRecord> {}'.format(self.request)
+
 
 class WMSLogRecord(OWSLogRecord):
     """OGC:WMS Log Record"""
@@ -177,6 +180,9 @@ class WMSLogRecord(OWSLogRecord):
         """WMS parameter to identify resource"""
 
         OWSLogRecord.__init__(self, line, service_type='OGC:WMS')
+
+    def __repr__(self):
+        return '<OWSLogRecord> {}'.format(self.request)
 
 
 class Analyzer(object):
@@ -214,6 +220,10 @@ class Analyzer(object):
         """user agents and counts"""
 
         LOGGER.info('Analyzing {} records'.format(len(records)))
+
+        if len(records) == 0:
+            LOGGER.info('No records to analyze')
+            return
 
         self.start = min(item.datetime for item in records)
         self.end = max(item.datetime for item in records)
@@ -255,6 +265,69 @@ class Analyzer(object):
         self.resources = sorted(self.resources.items(),
                                 key=lambda x: x[1], reverse=True)
 
+    def __repr__(self):
+        return '<Analyzer>'
+
+
+def parse_iso8601(value):
+    """
+    Convenience function to parse ISO8601
+    time instant or range
+
+    :param: input time string
+
+    :returns: list of either time instant or range
+    """
+
+    time_values = []
+
+    time_tokens = value.split('/')
+    LOGGER.debug('{} time tokens found'.format(len(time_tokens)))
+    for tt in time_tokens:
+        if 'T' in tt:  # YYYY-MM-DDTHH:MM:SS
+            LOGGER.debug('datetime found')
+            t = datetime.strptime(tt, '%Y-%m-%dT%H:%M:%S')
+        else:
+            LOGGER.debug('date found')
+            t = datetime.strptime(tt, '%Y-%m-%d')
+        time_values.append(t)
+
+    return time_values
+
+
+def test_time(intime, times, datetype='date'):
+    """
+    Tests intime against a time instant or time range
+
+    :param intime: `datetime.datetime` object
+    :param times: list of `datetime.datetime` objects
+    :param datetype: type of `datetime` object (`date` or `datetime`)
+
+    :returns: boolean of whether time matches or is in range
+    """
+
+    result = False
+
+    if len(times) == 1:  # time instant comparison
+        LOGGER.debug('comparing time instant')
+        if datetype == 'datetime':  # datetime.datetime comparison
+            LOGGER.debug('comparing datetime instant')
+            result = intime == times[0]
+        else:  # datetime.date comparison
+            LOGGER.debug('comparing date instant')
+            result = intime.date() == times[0].date()
+    else:  # time range comparison
+        LOGGER.debug('comparing time range')
+        if datetype == 'datetime':  # datetime.datetime comparison
+            LOGGER.debug('comparing datetime range')
+            result = intime <= times[1] and intime >= times[0]
+        else:  # datetime.date comparison
+            LOGGER.debug('comparing date range')
+            result = (intime.date() <= times[1].date() and
+                      intime.date() >= times[0].date())
+
+    return result
+
 
 class NotFoundError(Exception):
     """Value not found Exception"""
@@ -271,12 +344,15 @@ def log():
 @click.option('--logfile', '-l',
               type=click.Path(exists=True, resolve_path=True),
               help='logfile to parse')
+@click.option('--time', '-t', 'time_',
+              help='time filter (ISO8601 instance or start/end)')
 @click.option('--verbosity', type=click.Choice(['ERROR', 'WARNING',
               'INFO', 'DEBUG']), help='Verbosity')
-def analyze(ctx, logfile, verbosity, service_type='OGC:WMS'):
+def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
     """parse http access log"""
 
     records = []
+    time__ = []
 
     if verbosity is not None:
         logging.basicConfig(level=getattr(logging, verbosity))
@@ -286,13 +362,26 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS'):
     if logfile is None:
         raise click.UsageError('Missing --logfile argument')
 
+    if time_ is not None:
+        time__ = parse_iso8601(time_)
+
     with open(logfile) as ff:
         for line in ff.readlines():
             try:
                 r = WMSLogRecord(line)
-                records.append(r)
+                if time_ is not None:
+                    if test_time(r.datetime, time__):
+                        LOGGER.debug('Adding line based on time filter')
+                        records.append(r)
+                    else:
+                        LOGGER.debug('Skipping line based on time filter')
+                else:
+                    records.append(r)
             except NotFoundError:
                 pass
+
+    if len(records) == 0:
+        raise click.ClickException('No records to analyze')
 
     a = Analyzer(records)
 

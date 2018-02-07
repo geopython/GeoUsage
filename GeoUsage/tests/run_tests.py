@@ -33,7 +33,8 @@ except ImportError:
     from mock import patch
 
 
-from GeoUsage.log import Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord
+from GeoUsage.log import (Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord,
+                          parse_iso8601, test_time)
 from GeoUsage.mailing_list import MailmanAdmin
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
@@ -60,10 +61,10 @@ class LogTest(unittest.TestCase):
         self.assertEqual(len(records), 340)
 
         single_record = records[4]
-        self.assertEqual(single_record._line, '142.97.203.36 - - [26/Jan/2018:13:13:22 +0000] "GET /geomet?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities HTTP/1.1" 200 7176380 "-" "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/7.0; SLCC2; .NET CLR 2.0.50727; .NET4.0C; .NET4.0E; .NET CLR 3.5.30729; .NET CLR 3.0.30729; InfoPath.3)"')  # noqa
+        self.assertEqual(single_record._line, '142.97.203.36 - - [23/Jan/2018:13:13:22 +0000] "GET /geomet?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities HTTP/1.1" 200 7176380 "-" "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/7.0; SLCC2; .NET CLR 2.0.50727; .NET4.0C; .NET4.0E; .NET CLR 3.5.30729; .NET CLR 3.0.30729; InfoPath.3)"')  # noqa
         self.assertEqual(single_record.remote_host, '142.97.203.36')
         self.assertEqual(single_record.datetime,
-                         datetime(2018, 1, 26, 13, 13, 22))
+                         datetime(2018, 1, 23, 13, 13, 22))
         self.assertEqual(single_record.timezone, '+0000')
         self.assertEqual(single_record.request_type, 'GET')
         self.assertEqual(single_record.request,
@@ -80,6 +81,63 @@ class LogTest(unittest.TestCase):
         self.assertEqual(single_record.ows_request, 'GetCapabilities')
         self.assertEqual(len(single_record.kvp), 3)
         self.assertEqual(single_record.resource, 'layers')
+
+    def test_parse_iso8601(self):
+        """test GeoUsage.log.parse_iso8601"""
+
+        val = '2011-11-11'
+        result = parse_iso8601(val)
+        self.assertEqual(result, [datetime(2011, 11, 11, 0, 0)])
+
+        val = '2011-11-11/2012-11-23'
+        result = parse_iso8601(val)
+        self.assertEqual(result, [datetime(2011, 11, 11, 0, 0),
+                                  datetime(2012, 11, 23, 0, 0)])
+
+    def test_test_time(self):
+        """test GeoUsage.log.test_test_time"""
+
+        indate = datetime(2011, 11, 11, 0, 0)
+
+        # test single date
+        dates = [datetime(2011, 11, 11, 0, 0)]
+        result = test_time(indate, dates, datetype='date')
+        self.assertTrue(result)
+
+        dates = [datetime(2011, 12, 11, 0, 0)]
+        result = test_time(indate, dates, datetype='date')
+        self.assertFalse(result)
+
+        # test date range
+        dates = [datetime(2010, 12, 11, 0, 0), datetime(2012, 12, 11, 0, 0)]
+        result = test_time(indate, dates, datetype='date')
+        self.assertTrue(result)
+
+        dates = [datetime(2012, 12, 11, 0, 0), datetime(2013, 12, 11, 0, 0)]
+        result = test_time(indate, dates, datetype='date')
+        self.assertFalse(result)
+
+        intime = datetime(2011, 11, 11, 11, 11, 11)
+
+        # test single datetime
+        times = [datetime(2011, 11, 11, 11, 11, 11)]
+        result = test_time(intime, times, datetype='datetime')
+        self.assertTrue(result)
+
+        times = [datetime(2011, 12, 11, 0, 0)]
+        result = test_time(intime, times, datetype='datetime')
+        self.assertFalse(result)
+
+        # test datetime range
+        times = [datetime(2010, 12, 11, 11, 11, 11),
+                 datetime(2012, 12, 11, 11, 12, 42)]
+        result = test_time(intime, times, datetype='datetime')
+        self.assertTrue(result)
+
+        times = [datetime(2012, 12, 11, 22, 22, 22),
+                 datetime(2013, 12, 11, 14, 55, 22)]
+        result = test_time(intime, times, datetype='datetime')
+        self.assertFalse(result)
 
 
 class AnalyzerTest(unittest.TestCase):
@@ -104,8 +162,8 @@ class AnalyzerTest(unittest.TestCase):
 
         a = Analyzer(records)
 
-        self.assertEqual(a.start, datetime(2018, 1, 26, 11, 44, 25))
-        self.assertEqual(a.end, datetime(2018, 1, 26, 22, 42, 12))
+        self.assertEqual(a.start, datetime(2018, 1, 23, 11, 44, 25))
+        self.assertEqual(a.end, datetime(2018, 1, 28, 22, 42, 12))
         self.assertEqual(a.total_requests, 339)
         self.assertEqual(a.total_size, 882128934)
         self.assertEqual(len(a.unique_ips), 8)

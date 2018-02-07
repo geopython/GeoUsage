@@ -55,6 +55,18 @@ GeoUsage --version
 # perform WMS analysis on an Apache logfile
 GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile>
 
+# perform WMS analysis on an Apache logfile for a single date
+GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile> --time=2018-01-26
+
+# perform WMS analysis on an Apache logfile for a date range
+GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile> --time=2018-01-26/2018-01-27
+
+# perform WMS analysis on an Apache logfile for a single datetime
+GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11
+
+# perform WMS analysis on an Apache logfile for a datetime range
+GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11/2018-01-27T12:32:11
+
 # add verbose mode
 GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile> --verbosity=INFO
 
