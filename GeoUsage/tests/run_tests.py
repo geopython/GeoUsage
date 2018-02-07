@@ -62,7 +62,7 @@ class LogTest(unittest.TestCase):
 
         single_record = records[4]
         self.assertEqual(single_record._line, '142.97.203.36 - - [23/Jan/2018:13:13:22 +0000] "GET /geomet?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities HTTP/1.1" 200 7176380 "-" "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/7.0; SLCC2; .NET CLR 2.0.50727; .NET4.0C; .NET4.0E; .NET CLR 3.5.30729; .NET CLR 3.0.30729; InfoPath.3)"')  # noqa
-        self.assertEqual(single_record.remote_host, '142.97.203.36')
+        self.assertEqual(single_record.remote_host_ip, '142.97.203.36')
         self.assertEqual(single_record.datetime,
                          datetime(2018, 1, 23, 13, 13, 22))
         self.assertEqual(single_record.timezone, '+0000')
@@ -88,6 +88,10 @@ class LogTest(unittest.TestCase):
         val = '2011-11-11'
         result = parse_iso8601(val)
         self.assertEqual(result, [datetime(2011, 11, 11, 0, 0)])
+
+        val = '2011-11-11T11:11:11'
+        result = parse_iso8601(val)
+        self.assertEqual(result, [datetime(2011, 11, 11, 11, 11, 11)])
 
         val = '2011-11-11/2012-11-23'
         result = parse_iso8601(val)
@@ -167,6 +171,15 @@ class AnalyzerTest(unittest.TestCase):
         self.assertEqual(a.total_requests, 339)
         self.assertEqual(a.total_size, 882128934)
         self.assertEqual(len(a.unique_ips), 8)
+
+        unique_ips = dict(a.unique_ips)
+        self.assertTrue('131.235.251.154' in unique_ips)
+        self.assertTrue(unique_ips['131.235.251.154']['count'], 24)
+
+        a = Analyzer([])
+        self.assertEqual(a.start, None)
+        self.assertEqual(a.end, None)
+        self.assertEqual(a.requests, {})
 
         with self.assertRaises(NotFoundError):
             with open(access_log) as ff:

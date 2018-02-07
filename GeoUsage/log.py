@@ -27,6 +27,7 @@ __version__ = '0.1.0'
 
 from datetime import datetime
 import logging
+import socket
 
 import click
 
@@ -52,8 +53,11 @@ class LogRecord(object):
         self._line = line.strip()
         """raw line / record"""
 
-        self.remote_host = None
-        """remote host/IP"""
+        self.remote_host_ip = None
+        """remote host (IP)"""
+
+        self.remote_host_ip = None
+        """remote host (hostname)"""
 
         self.datetime = None
         """datetime.datetime object of request"""
@@ -85,7 +89,7 @@ class LogRecord(object):
         LOGGER.debug('Parsing log record')
         tokens = self._line.split()
 
-        self.remote_host = tokens[0]
+        self.remote_host_ip = tokens[0]
 
         self.datetime = datetime.strptime(tokens[3].lstrip('['),
                                           '%d/%b/%Y:%H:%M:%S')
@@ -210,7 +214,7 @@ class Analyzer(object):
         self.total_size = 0
         """total transfer (bytes)"""
 
-        self.unique_ips = []
+        self.unique_ips = {}
         """unique visitors"""
 
         self.resources = {}
@@ -254,8 +258,16 @@ class Analyzer(object):
                     self.resources[resource_name] = 1
 
             LOGGER.debug('Analyzing unique IP addresses')
-            if r.remote_host not in self.unique_ips:
-                self.unique_ips.append(r.remote_host)
+            if r.remote_host_ip in self.unique_ips:
+                self.unique_ips[r.remote_host_ip]['count'] += 1
+            else:
+                self.unique_ips[r.remote_host_ip] = {'count': 1}
+                try:
+                    a = socket.gethostbyaddr(r.remote_host_ip)
+                    hostname = a[0]
+                except socket.herror:
+                    hostname = None
+                self.unique_ips[r.remote_host_ip]['hostname'] = hostname
 
         LOGGER.debug('Analyzing total requests')
         self.total_requests = sum(item for item in self.requests.values())
@@ -264,6 +276,8 @@ class Analyzer(object):
                                key=lambda x: x[1], reverse=True)
         self.resources = sorted(self.resources.items(),
                                 key=lambda x: x[1], reverse=True)
+        self.unique_ips = sorted(self.unique_ips.items(),
+                                 key=lambda x: x[1]['count'], reverse=True)
 
     def __repr__(self):
         return '<Analyzer>'
@@ -391,7 +405,10 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
                                           a.end.isoformat()))
     click.echo('Total bytes transferred: {}\n'.format(a.total_size))
     click.echo('Unique visitors: {}\n'.format(len(a.unique_ips)))
-    click.echo('Requests breakdown ({}):'.format(a.total_requests))
+    for req in a.unique_ips:
+        click.echo('    {} ({}): {}'.format(req[0], req[1]['hostname'],
+                                            req[1]['count']))
+    click.echo('\nRequests breakdown ({}):'.format(a.total_requests))
     for req in a.requests:
         click.echo('    {}: {}'.format(req[0], req[1]))
     click.echo('\nMost Requested data breakdown:')
