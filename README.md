@@ -52,7 +52,10 @@ GeoUsage --help
 # get version
 GeoUsage --version
 
-# perform WMS analysis on an Apache logfile
+# perform WMS analysis on an Apache logfile on any WMS endpoint
+GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile>
+
+# perform WMS analysis on an Apache logfile on a specific WMS endpoint
 GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile>
 
 # perform WMS analysis on an Apache logfile for a single date

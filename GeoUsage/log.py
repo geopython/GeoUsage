@@ -383,9 +383,6 @@ def analyze(ctx, logfile, endpoint, verbosity, service_type='OGC:WMS',
     else:
         logging.getLogger(__name__).addHandler(logging.NullHandler())
 
-    if endpoint is None:
-        raise click.UsageError('Missing --endpoint argument')
-
     if logfile is None:
         raise click.UsageError('Missing --logfile argument')
 
