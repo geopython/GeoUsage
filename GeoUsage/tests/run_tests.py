@@ -82,6 +82,18 @@ class LogTest(unittest.TestCase):
         self.assertEqual(len(single_record.kvp), 3)
         self.assertEqual(single_record.resource, 'layers')
 
+        # constrain to a specific endpoint
+        records = []
+        with open(access_log) as ff:
+            for line in ff.readlines():
+                try:
+                    lr = WMSLogRecord(line, endpoint='/geomet2')
+                    records.append(lr)
+                except NotFoundError:
+                    pass
+
+        self.assertEqual(len(records), 0)
+
     def test_parse_iso8601(self):
         """test GeoUsage.log.parse_iso8601"""
 

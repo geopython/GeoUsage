@@ -108,7 +108,7 @@ class LogRecord(object):
 
 class OWSLogRecord(LogRecord):
     """OWS Log Record"""
-    def __init__(self, line, service_type=None):
+    def __init__(self, line, endpoint=None, service_type=None):
         """
         Initialize an OWSLogRecord object
 
@@ -134,6 +134,13 @@ class OWSLogRecord(LogRecord):
 
         LogRecord.__init__(self, line)
 
+        LOGGER.debug('Analyzing URL match')
+
+        if endpoint is not None and not self.request.startswith(endpoint):
+            msg = 'endpoint not found'
+            LOGGER.warning(msg)
+            raise NotFoundError(msg)
+
         LOGGER.debug('Splitting OWS request line')
 
         try:
@@ -146,7 +153,7 @@ class OWSLogRecord(LogRecord):
         for _kvp in _kvps.split('&'):
             LOGGER.debug('keyword/value pair: {}'.format(_kvp))
             if '=' in _kvp:
-                k, v = _kvp.split('=')
+                k, v = _kvp.split('=', 1)
                 self.kvp[k.lower()] = v
 
         if 'service' in self.kvp:
@@ -171,7 +178,7 @@ class OWSLogRecord(LogRecord):
 
 class WMSLogRecord(OWSLogRecord):
     """OGC:WMS Log Record"""
-    def __init__(self, line):
+    def __init__(self, line, endpoint=None):
         """
         Initialize an OWSLogRecord object
 
@@ -183,7 +190,8 @@ class WMSLogRecord(OWSLogRecord):
         self.resource = 'layers'
         """WMS parameter to identify resource"""
 
-        OWSLogRecord.__init__(self, line, service_type='OGC:WMS')
+        OWSLogRecord.__init__(self, line, endpoint=endpoint,
+                              service_type='OGC:WMS')
 
     def __repr__(self):
         return '<OWSLogRecord> {}'.format(self.request)
@@ -358,11 +366,13 @@ def log():
 @click.option('--logfile', '-l',
               type=click.Path(exists=True, resolve_path=True),
               help='logfile to parse')
+@click.option('--endpoint', '-e', help='OWS endpoint (base URL)')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
 @click.option('--verbosity', type=click.Choice(['ERROR', 'WARNING',
               'INFO', 'DEBUG']), help='Verbosity')
-def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
+def analyze(ctx, logfile, endpoint, verbosity, service_type='OGC:WMS',
+            time_=None):
     """parse http access log"""
 
     records = []
@@ -373,6 +383,9 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
     else:
         logging.getLogger(__name__).addHandler(logging.NullHandler())
 
+    if endpoint is None:
+        raise click.UsageError('Missing --endpoint argument')
+
     if logfile is None:
         raise click.UsageError('Missing --logfile argument')
 
@@ -382,7 +395,7 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
     with open(logfile) as ff:
         for line in ff.readlines():
             try:
-                r = WMSLogRecord(line)
+                r = WMSLogRecord(line, endpoint=endpoint)
                 if time_ is not None:
                     if test_time(r.datetime, time__):
                         LOGGER.debug('Adding line based on time filter')
@@ -399,19 +412,20 @@ def analyze(ctx, logfile, verbosity, service_type='OGC:WMS', time_=None):
 
     a = Analyzer(records)
 
-    click.echo('\nGeoUsage Analysis\n')
+    click.echo('\nGeoUsage Analysis')
+    click.echo('=================\n')
     click.echo('Logfile: {}\n'.format(logfile))
     click.echo('Period: {} - {}\n'.format(a.start.isoformat(),
                                           a.end.isoformat()))
     click.echo('Total bytes transferred: {}\n'.format(a.total_size))
-    click.echo('Unique visitors: {}\n'.format(len(a.unique_ips)))
+    click.echo('Unique visitors ({}):'.format(len(a.unique_ips)))
     for req in a.unique_ips:
         click.echo('    {} ({}): {}'.format(req[0], req[1]['hostname'],
                                             req[1]['count']))
-    click.echo('\nRequests breakdown ({}):'.format(a.total_requests))
+    click.echo('\nRequests ({}):'.format(a.total_requests))
     for req in a.requests:
         click.echo('    {}: {}'.format(req[0], req[1]))
-    click.echo('\nMost Requested data breakdown:')
+    click.echo('\nRequested data:'.format(len(a.resources)))
     for res in a.resources:
         click.echo('    {}: {}'.format(res[0], res[1]))
 
