@@ -26,6 +26,7 @@
 __version__ = '0.1.0'
 
 from datetime import datetime
+import gzip
 import logging
 import socket
 
@@ -389,7 +390,11 @@ def analyze(ctx, logfile, endpoint, verbosity, service_type='OGC:WMS',
     if time_ is not None:
         time__ = parse_iso8601(time_)
 
-    with open(logfile) as ff:
+    if logfile.endswith('gz'):
+        open_ = gzip.open
+    else:
+        open_ = open
+    with open_(logfile, 'rt') as ff:
         for line in ff.readlines():
             try:
                 r = WMSLogRecord(line, endpoint=endpoint)
