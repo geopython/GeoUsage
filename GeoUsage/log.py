@@ -199,10 +199,11 @@ class WMSLogRecord(OWSLogRecord):
 
 class Analyzer(object):
     """Log Analyzer"""
-    def __init__(self, records=[]):
+    def __init__(self, records=[], resolve_ips=False):
         """
         Initialize an Analyzer object
         :param records: list of LogRecord objects
+        :param resolve_ips: resolve IPs (boolean)
 
         :returns: GeoUsage.Analyzer instance
         """
@@ -270,12 +271,15 @@ class Analyzer(object):
                 self.unique_ips[r.remote_host_ip]['count'] += 1
             else:
                 self.unique_ips[r.remote_host_ip] = {'count': 1}
-                try:
-                    a = socket.gethostbyaddr(r.remote_host_ip)
-                    hostname = a[0]
-                except socket.herror:
-                    hostname = None
-                self.unique_ips[r.remote_host_ip]['hostname'] = hostname
+                if resolve_ips:
+                    try:
+                        a = socket.gethostbyaddr(r.remote_host_ip)
+                        hostname = a[0]
+                    except socket.herror:
+                        hostname = None
+                    self.unique_ips[r.remote_host_ip]['hostname'] = hostname
+                else:
+                    self.unique_ips[r.remote_host_ip]['hostname'] = None
 
         LOGGER.debug('Analyzing total requests')
         self.total_requests = sum(item for item in self.requests.values())
@@ -367,14 +371,16 @@ def log():
 @click.option('--logfile', '-l',
               type=click.Path(exists=True, resolve_path=True),
               help='logfile to parse')
+@click.option('--resolve-ips', '-r', 'resolve_ips', default=False,
+              is_flag=True, help='resolve IP addresses')
 @click.option('--service-type', '-s', 'service_type',
-              type=click.Choice(['OGC:WMS']), help='service type')
+              type=click.Choice(['OGC:WMS', 'OGC:WCS']), help='service type')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
 @click.option('--verbosity', type=click.Choice(['ERROR', 'WARNING',
               'INFO', 'DEBUG']), help='Verbosity')
-def analyze(ctx, logfile, endpoint, verbosity, service_type='OGC:WMS',
-            time_=None):
+def analyze(ctx, logfile, endpoint, verbosity, resolve_ips=False,
+            service_type='OGC:WMS', time_=None):
     """parse http access log"""
 
     records = []
@@ -413,7 +419,7 @@ def analyze(ctx, logfile, endpoint, verbosity, service_type='OGC:WMS',
     if len(records) == 0:
         raise click.ClickException('No records to analyze')
 
-    a = Analyzer(records)
+    a = Analyzer(records, resolve_ips=resolve_ips)
 
     click.echo('\nGeoUsage Analysis')
     click.echo('=================\n')

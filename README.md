@@ -70,6 +70,9 @@ GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/
 # perform WMS analysis on an Apache logfile for a datetime range
 GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11/2018-01-27T12:32:11
 
+# resolve IP addresses
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO --resolve-ips
+
 # add verbose mode
 GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO
 
