@@ -164,14 +164,13 @@ class OWSLogRecord(LogRecord):
         if 'request' in self.kvp:
             self.ows_request = self.kvp['request']
 
-#        if service_type is not None:
-#            if service_type in SERVICE_TYPES:
-#                service_type_ = SERVICE_TYPES[service_type]
-#                print(self.service, service_type_)
-#                if self.service is not None and service_type_ != self.service:
-#                    msg = 'Service type {} not found'.format(service_type_)
-#                    LOGGER.warning(msg)
-#                    raise NotFoundError(msg)
+        if service_type is not None:
+            if service_type in SERVICE_TYPES:
+                service_type_ = SERVICE_TYPES[service_type]
+                if self.service is not None and service_type_ != self.service:
+                    msg = 'Service type {} not found'.format(service_type_)
+                    LOGGER.error(msg)
+                    raise NotFoundError(msg)
 
     def __repr__(self):
         return '<OWSLogRecord> {}'.format(self.request)
@@ -364,10 +363,12 @@ def log():
 
 @click.command()
 @click.pass_context
+@click.option('--endpoint', '-e', help='OWS endpoint (base URL)')
 @click.option('--logfile', '-l',
               type=click.Path(exists=True, resolve_path=True),
               help='logfile to parse')
-@click.option('--endpoint', '-e', help='OWS endpoint (base URL)')
+@click.option('--service-type', '-s', 'service_type',
+              type=click.Choice(['OGC:WMS']), help='service type')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
 @click.option('--verbosity', type=click.Choice(['ERROR', 'WARNING',

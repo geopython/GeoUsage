@@ -53,25 +53,25 @@ GeoUsage --help
 GeoUsage --version
 
 # perform WMS analysis on an Apache logfile on any WMS endpoint
-GeoUsage log analyze --service=OGC:WMS --logfile </path/to/apache_logfile>
+GeoUsage log analyze --service-type=OGC:WMS --logfile </path/to/apache_logfile>
 
 # perform WMS analysis on an Apache logfile on a specific WMS endpoint
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile>
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile>
 
 # perform WMS analysis on an Apache logfile for a single date
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26
 
 # perform WMS analysis on an Apache logfile for a date range
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26/2018-01-27
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26/2018-01-27
 
 # perform WMS analysis on an Apache logfile for a single datetime
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11
 
 # perform WMS analysis on an Apache logfile for a datetime range
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11/2018-01-27T12:32:11
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11/2018-01-27T12:32:11
 
 # add verbose mode
-GeoUsage log analyze --service=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO
 
 # query a Mailman mailing list member count
 GeoUsage mailing_list member_count
