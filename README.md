@@ -17,6 +17,10 @@ utility:
 pip install GeoUsage
 ```
 
+This assumes you have the privileges to install GeoUsage on your system
+which may require administrator/root privileges.  For isolated installations,
+see [Installing GeoUsage in a virtualenv](#installing-geousage-in-a-virtualenv).
+
 ### Requirements
 - Python 3.  Works with Python 2.7
 - [virtualenv](https://virtualenv.pypa.io/)
@@ -25,7 +29,11 @@ pip install GeoUsage
 Dependencies are listed in [requirements.txt](requirements.txt). Dependencies
 are automatically installed during GeoUsage installation.
 
-### Installing GeoUsage
+### Installing GeoUsage in a virtualenv
+
+Using a virtualenv allows for isolated installations which do not affect
+system wide dependencies which require administrative/root privileges.  To
+install to a virtualenv, perform the following steps:
 
 ```bash
 # setup virtualenv
