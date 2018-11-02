@@ -22,7 +22,7 @@ which may require administrator/root privileges.  For isolated installations,
 see [Installing GeoUsage in a virtualenv](#installing-geousage-in-a-virtualenv).
 
 ### Requirements
-- Python 3.  Works with Python 2.7
+- Python 3
 - [virtualenv](https://virtualenv.pypa.io/)
 
 ### Dependencies
