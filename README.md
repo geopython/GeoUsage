@@ -81,6 +81,9 @@ GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/
 # resolve IP addresses
 GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO --resolve-ips
 
+# show top 10 unique IPs and top 10 layers
+GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO --resolve-ips --top=10
+
 # add verbose mode
 GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO
 
