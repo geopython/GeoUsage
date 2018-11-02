@@ -70,7 +70,7 @@ class MailmanAdmin(object):
                                  data={'adminpw': self.password})
         LOGGER.debug('Parsing HTML')
 
-        element = re.search('(\d+) members total', response.text).group(0)
+        element = re.search(r'(\d+) members total', response.text).group(0)
         members = int(element.split('members total')[0].strip())
 
         return members

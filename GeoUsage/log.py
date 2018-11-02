@@ -374,13 +374,16 @@ def log():
 @click.option('--resolve-ips', '-r', 'resolve_ips', default=False,
               is_flag=True, help='resolve IP addresses')
 @click.option('--service-type', '-s', 'service_type',
-              type=click.Choice(['OGC:WMS', 'OGC:WCS']), help='service type')
+              type=click.Choice(['OGC:WMS', 'OGC:WCS']), default='OGC:WMS',
+              help='service type')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
+@click.option('--top', '-top', 'top', default=10,
+              help='only show top n visitors/resources (default 10)')
 @click.option('--verbosity', type=click.Choice(['ERROR', 'WARNING',
               'INFO', 'DEBUG']), help='Verbosity')
-def analyze(ctx, logfile, endpoint, verbosity, resolve_ips=False,
-            service_type='OGC:WMS', time_=None):
+def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
+            service_type, time_):
     """parse http access log"""
 
     records = []
@@ -421,21 +424,37 @@ def analyze(ctx, logfile, endpoint, verbosity, resolve_ips=False,
 
     a = Analyzer(records, resolve_ips=resolve_ips)
 
+    if top is not None:
+        total_resources_to_display = top
+        total_unique_ips_to_display = top
+    else:
+        total_resources_to_display = len(a.resources)
+        total_unique_ips_to_display = len(a.unique_ips)
+
+    if total_resources_to_display > len(a.resources):
+        total_resources_to_display = len(a.resources)
+    if total_unique_ips_to_display > len(a.resources):
+        total_unique_ips_to_display = len(a.unique_ips)
+
     click.echo('\nGeoUsage Analysis')
     click.echo('=================\n')
     click.echo('Logfile: {}\n'.format(logfile))
     click.echo('Period: {} - {}\n'.format(a.start.isoformat(),
                                           a.end.isoformat()))
     click.echo('Total bytes transferred: {}\n'.format(a.total_size))
-    click.echo('Unique visitors ({}):'.format(len(a.unique_ips)))
-    for req in a.unique_ips:
+    click.echo(
+        'Unique visitors (showing top {} of {}):'.format(
+            total_unique_ips_to_display, len(a.unique_ips)))
+    for req in a.unique_ips[:total_unique_ips_to_display]:
         click.echo('    {} ({}): {}'.format(req[0], req[1]['hostname'],
                                             req[1]['count']))
     click.echo('\nRequests ({}):'.format(a.total_requests))
     for req in a.requests:
         click.echo('    {}: {}'.format(req[0], req[1]))
-    click.echo('\nRequested data:'.format(len(a.resources)))
-    for res in a.resources:
+    click.echo('\nRequested data (showing top {} of {}):'.format(
+        total_resources_to_display, len(a.resources)))
+
+    for res in a.resources[:total_resources_to_display]:
         click.echo('    {}: {}'.format(res[0], res[1]))
 
 
