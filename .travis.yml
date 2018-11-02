@@ -1,9 +1,5 @@
 language: python
 
-sudo: required
-
-dist: xenial
-
 virtualenv:
   system_site_packages: true
 
@@ -14,9 +10,6 @@ addons:
 
 python:
   - "3.4"
-  - "3.5"
-  - "3.6"
-  - "3.7"
 
 install:
   - pip install -r requirements-dev.txt
