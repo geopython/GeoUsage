@@ -91,6 +91,31 @@ GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/
 GeoUsage mailing_list member_count
 ```
 
+### ElasticSearch logging [BETA]
+
+GeoUsage can parse and save to 2 ElasticSearch indexes: individual log records and daily stats. Currently, it can only save to ES on your local host server. If you require changes, please edit `/GeoUsage/log_es.py`.
+
+```bash
+# help with parsing and ES indexing
+GeoUsage log-es --help
+
+# parse logs and analyze log records to daily stats
+GeoUsage log-es index </file/path/pattern/to/apache_logfile>
+
+# parse and analyze the latest available day matching the file pattern
+GeoUsage log-es index </file/path/pattern/to/apache_logfile> --latest-day
+
+# help with clearing ES log records
+GeoUsage clear-logs --help
+
+# clear individual log records up to a certain datetime
+GeoUsage clear-logs --date-to <YYYY-MM-DDTHH:MM:SS>
+
+# clear individual log records past {n} days ago from today
+GeoUsage clear-logs --past-days {n}
+```
+
+
 ### Using the API
 
 ```python

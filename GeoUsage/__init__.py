@@ -28,6 +28,7 @@ __version__ = '0.1.0'
 import click
 
 from GeoUsage.log import log
+from GeoUsage.log_es import log_es
 from GeoUsage.mailing_list import mailing_list
 
 USER_AGENT = 'GeoUsage (https://github.com/geopython/GeoUsage)'
@@ -40,4 +41,5 @@ def cli():
 
 
 cli.add_command(log)
+cli.add_command(log_es)
 cli.add_command(mailing_list)
