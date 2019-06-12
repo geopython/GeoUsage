@@ -1,7 +1,6 @@
 coverage
 docutils
 flake8
-pypandoc
 twine
 wheel
 mock  # for Python 2 testing
