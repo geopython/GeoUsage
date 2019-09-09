@@ -25,7 +25,10 @@
 
 from datetime import datetime
 import os
+import time
 import unittest
+from unittest.runner import TextTestResult
+from unittest import TextTestRunner
 
 try:
     from unittest.mock import patch
@@ -34,10 +37,30 @@ except ImportError:
 
 
 from GeoUsage.log import (Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord,
-                          parse_iso8601, test_time)
+                          parse_iso8601, test_time, dot2longip)
 from GeoUsage.mailing_list import MailmanAdmin
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
+
+SLOW_TEST_THRESHOLD = 0.3
+
+
+class TimeLoggingTestResult(TextTestResult):
+    """Outputs timing of slow running tests. Slowness threshold is the number
+    of seconds defined by SLOW_TEST_THRESHOLD"""
+
+    def start_test(self, test):
+        self._started_at = time.time()
+        super().start_test(test)
+
+    def add_success(self, test):
+        elapsed = time.time() - self._started_at
+        m, s = divmod(elapsed, 60)
+        h, m = divmod(m, 60)
+        if elapsed > SLOW_TEST_THRESHOLD:
+            name = self.getDescription(test)
+            self.stream.write("\n{} ({}h {}m {:.03}s)\n".format(name, h, m, s))
+        super().add_success(test)
 
 
 class LogTest(unittest.TestCase):
@@ -50,34 +73,34 @@ class LogTest(unittest.TestCase):
 
         access_log = get_abspath('access.log')
 
-        with open(access_log) as ff:
-            for line in ff.readlines():
+        with open(access_log, 'rt') as ff:
+            for line in ff:
                 try:
                     lr = WMSLogRecord(line)
                     records.append(lr)
                 except NotFoundError:
                     pass
 
-        self.assertEqual(len(records), 340)
+        self.assertEqual(len(records), 341)
 
         single_record = records[4]
-        self.assertEqual(single_record._line, '142.97.203.36 - - [23/Jan/2018:13:13:22 +0000] "GET /geomet?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities HTTP/1.1" 200 7176380 "-" "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.1; WOW64; Trident/7.0; SLCC2; .NET CLR 2.0.50727; .NET4.0C; .NET4.0E; .NET CLR 3.5.30729; .NET CLR 3.0.30729; InfoPath.3)"')  # noqa
-        self.assertEqual(single_record.remote_host_ip, '142.97.203.36')
+        self.assertEqual(single_record._line, '131.235.251.154 - - [23/Jan/2018:13:09:45 +0000] "GET /geomet/?service=WMS&version=1.3.0&request=GetCapabilities HTTP/1.1" 200 101395 "-" "Mozilla/5.0 (Windows NT 6.1; WOW64; rv:57.0) Gecko/20100101 Firefox/57.0"')  # noqa
+        self.assertEqual(single_record.remote_host_ip, '131.235.251.154')
         self.assertEqual(single_record.datetime,
-                         datetime(2018, 1, 23, 13, 13, 22))
+                         datetime(2018, 1, 23, 13, 9, 45))
         self.assertEqual(single_record.timezone, '+0000')
         self.assertEqual(single_record.request_type, 'GET')
         self.assertEqual(single_record.request,
-                         '/geomet?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities')  # noqa
+                         '/geomet/?service=WMS&version=1.3.0&request=GetCapabilities')  # noqa
         self.assertEqual(single_record.protocol, 'HTTP/1.1')
         self.assertEqual(single_record.status_code, 200)
-        self.assertEqual(single_record.size, 7176380)
+        self.assertEqual(single_record.size, 101395)
         self.assertEqual(single_record.referer, '-')
-        self.assertEqual(single_record.user_agent, 'Mozilla/4.0')
-
-        self.assertEqual(single_record.baseurl, '/geomet')
+        self.assertEqual(single_record.user_agent, ('Mozilla/5.0 (Windows NT '
+                         '6.1; WOW64; rv:57.0) Gecko/20100101 Firefox/57.0'))
+        self.assertEqual(single_record.baseurl, '/geomet/')
         self.assertEqual(single_record.service, 'WMS')
-        self.assertEqual(single_record.version, '1.1.1')
+        self.assertEqual(single_record.version, '1.3.0')
         self.assertEqual(single_record.ows_request, 'GetCapabilities')
         self.assertEqual(len(single_record.kvp), 3)
         self.assertEqual(single_record.resource, 'layers')
@@ -85,7 +108,7 @@ class LogTest(unittest.TestCase):
         # constrain to a specific endpoint
         records = []
         with open(access_log) as ff:
-            for line in ff.readlines():
+            for line in ff:
                 try:
                     lr = WMSLogRecord(line, endpoint='/geomet2')
                     records.append(lr)
@@ -155,6 +178,25 @@ class LogTest(unittest.TestCase):
         result = test_time(intime, times, datetype='datetime')
         self.assertFalse(result)
 
+    def test_dot2longip(self):
+        """Test function that converts an IP address to an IP number"""
+
+        ip = '172.217.15.110'
+        ip_number = dot2longip(ip)
+        self.assertEqual(ip_number, 2899906414)
+
+        ip = '23.78.198.125'
+        ip_number = dot2longip(ip)
+        self.assertEqual(ip_number, 391038589)
+
+        ip = ''
+        ip_number = dot2longip(ip)
+        self.assertEqual(ip_number, 0)
+
+        ip = None
+        ip_number = dot2longip(ip)
+        self.assertEqual(ip_number, 0)
+
 
 class AnalyzerTest(unittest.TestCase):
     """Test case for GeoUsage.log.Analyzer"""
@@ -167,21 +209,21 @@ class AnalyzerTest(unittest.TestCase):
         access_log = get_abspath('access.log')
 
         with open(access_log) as ff:
-            for line in ff.readlines():
+            for line in ff:
                 try:
                     lr = WMSLogRecord(line)
                     records.append(lr)
                 except NotFoundError:
                     pass
 
-        self.assertEqual(len(records), 340)
+        self.assertEqual(len(records), 341)
 
         a = Analyzer(records)
 
-        self.assertEqual(a.start, datetime(2018, 1, 23, 11, 44, 25))
+        self.assertEqual(a.start, datetime(2018, 1, 23, 11, 42, 25))
         self.assertEqual(a.end, datetime(2018, 1, 28, 22, 42, 12))
         self.assertEqual(a.total_requests, 339)
-        self.assertEqual(a.total_size, 882128934)
+        self.assertEqual(a.total_size, 882128944)
         self.assertEqual(len(a.unique_ips), 8)
 
         unique_ips = dict(a.unique_ips)
@@ -195,7 +237,7 @@ class AnalyzerTest(unittest.TestCase):
 
         with self.assertRaises(NotFoundError):
             with open(access_log) as ff:
-                for line in ff.readlines():
+                for line in ff:
                     lr = OWSLogRecord(line, service_type='OGC:WFS')
 
 
@@ -221,4 +263,6 @@ def get_abspath(filepath):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    # Show elapsed time for slow test cases
+    test_runner = TextTestRunner(resultclass=TimeLoggingTestResult)
+    unittest.main(verbosity=2, testRunner=test_runner)

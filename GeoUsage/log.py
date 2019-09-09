@@ -26,10 +26,11 @@
 __version__ = '0.1.0'
 
 from datetime import datetime
+from urllib.parse import unquote
 import gzip
 import logging
 import socket
-
+import ipaddress
 import click
 
 LOGGER = logging.getLogger(__name__)
@@ -57,8 +58,8 @@ class LogRecord(object):
         self.remote_host_ip = None
         """remote host (IP)"""
 
-        self.remote_host_ip = None
-        """remote host (hostname)"""
+        self.ip_number = None
+        """converted remote host IP address to IP number"""
 
         self.datetime = None
         """datetime.datetime object of request"""
@@ -90,18 +91,42 @@ class LogRecord(object):
         LOGGER.debug('Parsing log record')
         tokens = self._line.split()
 
-        self.remote_host_ip = tokens[0]
+        if len(tokens) < 12:
+            msg = 'Line does not contain expected apache record format'
+            LOGGER.warning(msg)
+            raise NotFoundError(msg)
 
-        self.datetime = datetime.strptime(tokens[3].lstrip('['),
-                                          '%d/%b/%Y:%H:%M:%S')
+        # validate IP address
+        self.ip_number = dot2longip(tokens[0])
+        if self.ip_number != 0:
+            self.remote_host_ip = tokens[0]
+
+        try:
+            self.datetime = datetime.strptime(tokens[3].lstrip('['),
+                                              '%d/%b/%Y:%H:%M:%S')
+        except ValueError:
+            msg = ('Datetime token ({}) that does not match the expected '
+                   'datetime format').format(tokens[3].lstrip('['))
+            LOGGER.warning(msg)
+            raise NotFoundError(msg)
+
         self.timezone = tokens[4].rstrip(']')
         self.request_type = tokens[5].lstrip('"')
         self.request = tokens[6]
         self.protocol = tokens[7].rstrip('"')
-        self.status_code = int(tokens[8])
-        self.size = int(tokens[9])
+
+        try:
+            self.status_code = int(tokens[8])
+            if tokens[9] != '-':  # ignore size values that are "-"
+                self.size = int(tokens[9])
+        except ValueError:
+            msg = ('Status code ({}) or size ({}) are invalid literals for '
+                   'int type').format(tokens[8], tokens[9])
+            LOGGER.warning(msg)
+            raise NotFoundError(msg)
+
         self.referer = tokens[10].replace('"', '')
-        self.user_agent = tokens[11].lstrip('"')
+        self.user_agent = ' '.join(tokens[11:]).lstrip('"').rstrip('"')
 
     def __repr__(self):
         return '<LogRecord> {}'.format(self.request)
@@ -130,32 +155,55 @@ class OWSLogRecord(LogRecord):
         self.ows_request = None
         """OWS request"""
 
+        self.crs = None
+        """OWS CRS projection (WMS and WCS)"""
+
+        self.format = None
+        """OWS format (WMS, WFS and WCS)"""
+
+        self.ows_resource = None
+        """OWS resource ([WMS] layers, layer, [WFS] typename,
+            [WCS] coverageid)"""
+
+        self.styles = None
+        """OWS styles (WMS)"""
+
         self.kvp = {}
         """keyword/value of request parameters and values"""
 
-        LogRecord.__init__(self, line)
+        # [WMS] layer, layers; [WFS] typename; [WCS] coverageid
+        layer_keys = ['layer', 'layers', 'typename', 'coverageid']
+
+        try:
+            LogRecord.__init__(self, line)
+        except (NotFoundError, ValueError):
+            msg = 'OWSLogRecord has failed to instantiate LogRecord'
+            LOGGER.error(msg)
+            raise NotFoundError(msg)
 
         LOGGER.debug('Analyzing URL match')
 
         if endpoint is not None and not self.request.startswith(endpoint):
-            msg = 'endpoint not found'
+            msg = 'Log record endpoint not found'
             LOGGER.warning(msg)
             raise NotFoundError(msg)
 
         LOGGER.debug('Splitting OWS request line')
 
-        try:
-            self.baseurl, _kvps = self.request.split('?')
-        except ValueError:
-            msg = 'Non OWS URL'
-            LOGGER.warning(msg)
-            raise NotFoundError(msg)
+        _kvps = ''
+        if '?' in self.request:
+            self.baseurl, _kvps = self.request.split('?', 1)
+        else:
+            self.baseurl = self.request
+            msg = ('Log record has non OWS URL from this request: {}.\n'
+                   'Original log line: {}').format(self.request, line)
+            LOGGER.debug(msg)
 
         for _kvp in _kvps.split('&'):
             LOGGER.debug('keyword/value pair: {}'.format(_kvp))
             if '=' in _kvp:
                 k, v = _kvp.split('=', 1)
-                self.kvp[k.lower()] = v
+                self.kvp[unquote(k.lower())] = unquote(v)  # URL decoding
 
         if 'service' in self.kvp:
             self.service = self.kvp['service']
@@ -163,6 +211,24 @@ class OWSLogRecord(LogRecord):
             self.version = self.kvp['version']
         if 'request' in self.kvp:
             self.ows_request = self.kvp['request']
+        if 'styles' in self.kvp:
+            self.styles = self.kvp['styles']
+
+        if 'crs' in self.kvp:  # WMS projection
+            self.crs = self.kvp['crs'].replace('%3A', ':')
+        elif 'subsettingcrs' in self.kvp:  # WCS projection
+            self.crs = self.kvp['subsettingcrs'].replace('%3A', ':')
+
+        if 'format' in self.kvp:  # WMS/WCS format
+            self.format = self.kvp['format']
+        if 'outputformat' in self.kvp:  # WFS format
+            self.format = self.kvp['outputformat']
+
+        # OWS resource from multiple request types
+        for layer_k in layer_keys:
+            if layer_k in self.kvp:
+                self.ows_resource = self.kvp[layer_k]
+                break
 
         if service_type is not None:
             if service_type in SERVICE_TYPES:
@@ -259,27 +325,32 @@ class Analyzer(object):
                 self.user_agents[r.user_agent] = 1
 
             LOGGER.debug('Analyzing data usage')
-            if r.resource in r.kvp:
-                resource_name = r.kvp[r.resource]
+            r_resource = 'layers'  # non-WMSLogRecord
+            if hasattr(r, 'resource'):  # WMSLogRecord
+                r_resource = r.resource
+            if r_resource in r.kvp:
+                # the "layers=" of the request
+                resource_name = r.kvp[r_resource]
                 if resource_name in self.resources:
                     self.resources[resource_name] += 1
                 else:
                     self.resources[resource_name] = 1
 
             LOGGER.debug('Analyzing unique IP addresses')
-            if r.remote_host_ip in self.unique_ips:
-                self.unique_ips[r.remote_host_ip]['count'] += 1
+            r_remote_host_ip = r.remote_host_ip
+            if r_remote_host_ip in self.unique_ips:
+                self.unique_ips[r_remote_host_ip]['count'] += 1
             else:
-                self.unique_ips[r.remote_host_ip] = {'count': 1}
+                self.unique_ips[r_remote_host_ip] = {'count': 1}
                 if resolve_ips:
                     try:
                         a = socket.gethostbyaddr(r.remote_host_ip)
                         hostname = a[0]
                     except socket.herror:
                         hostname = None
-                    self.unique_ips[r.remote_host_ip]['hostname'] = hostname
+                    self.unique_ips[r_remote_host_ip]['hostname'] = hostname
                 else:
-                    self.unique_ips[r.remote_host_ip]['hostname'] = None
+                    self.unique_ips[r_remote_host_ip]['hostname'] = None
 
         LOGGER.debug('Analyzing total requests')
         self.total_requests = sum(item for item in self.requests.values())
@@ -290,6 +361,8 @@ class Analyzer(object):
                                 key=lambda x: x[1], reverse=True)
         self.unique_ips = sorted(self.unique_ips.items(),
                                  key=lambda x: x[1]['count'], reverse=True)
+        self.user_agents = sorted(self.user_agents.items(),
+                                  key=lambda x: x[1], reverse=True)
 
     def __repr__(self):
         return '<Analyzer>'
@@ -310,7 +383,7 @@ def parse_iso8601(value):
     time_tokens = value.split('/')
     LOGGER.debug('{} time tokens found'.format(len(time_tokens)))
     for tt in time_tokens:
-        if 'T' in tt:  # YYYY-MM-DDTHH:MM:SS
+        if 'T' in tt:   # YYYY-MM-DDTHH:MM:SS
             LOGGER.debug('datetime found')
             t = datetime.strptime(tt, '%Y-%m-%dT%H:%M:%S')
         else:
@@ -336,18 +409,18 @@ def test_time(intime, times, datetype='date'):
 
     if len(times) == 1:  # time instant comparison
         LOGGER.debug('comparing time instant')
-        if datetype == 'datetime':  # datetime.datetime comparison
+        if datetype == 'datetime':   # datetime.datetime comparison
             LOGGER.debug('comparing datetime instant')
             result = intime == times[0]
-        else:  # datetime.date comparison
+        else:   # datetime.date comparison
             LOGGER.debug('comparing date instant')
             result = intime.date() == times[0].date()
-    else:  # time range comparison
+    else:   # time range comparison
         LOGGER.debug('comparing time range')
-        if datetype == 'datetime':  # datetime.datetime comparison
+        if datetype == 'datetime':   # datetime.datetime comparison
             LOGGER.debug('comparing datetime range')
             result = intime <= times[1] and intime >= times[0]
-        else:  # datetime.date comparison
+        else:   # datetime.date comparison
             LOGGER.debug('comparing date range')
             result = (intime.date() <= times[1].date() and
                       intime.date() >= times[0].date())
@@ -355,8 +428,30 @@ def test_time(intime, times, datetype='date'):
     return result
 
 
+def dot2longip(ip):
+    """Converts an IPv4 address to an IP number"""
+
+    ip_number = 0
+
+    try:
+        parsed_ip = ipaddress.IPv4Address(ip)
+        ip_number = int(parsed_ip)
+    except (AddressValueError, ipaddress.AddressValueError):
+        ip_number = 0
+        msg = ('Could not convert this IP address to an IP number: {}.'
+               'Skipping...').format(ip)
+        LOGGER.debug(msg)
+
+    return ip_number
+
+
 class NotFoundError(Exception):
     """Value not found Exception"""
+    pass
+
+
+class AddressValueError(Exception):
+    """IP address value error"""
     pass
 
 
@@ -427,14 +522,18 @@ def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
     if top is not None:
         total_resources_to_display = top
         total_unique_ips_to_display = top
+        total_user_agents_to_display = top
     else:
         total_resources_to_display = len(a.resources)
         total_unique_ips_to_display = len(a.unique_ips)
+        total_user_agents_to_display = len(a.user_agents)
 
     if total_resources_to_display > len(a.resources):
         total_resources_to_display = len(a.resources)
-    if total_unique_ips_to_display > len(a.resources):
+    if total_unique_ips_to_display > len(a.unique_ips):
         total_unique_ips_to_display = len(a.unique_ips)
+    if total_user_agents_to_display > len(a.user_agents):
+        total_user_agents_to_display = len(a.user_agents)
 
     click.echo('\nGeoUsage Analysis')
     click.echo('=================\n')
@@ -455,6 +554,11 @@ def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
         total_resources_to_display, len(a.resources)))
 
     for res in a.resources[:total_resources_to_display]:
+        click.echo('    {}: {}'.format(res[0], res[1]))
+    click.echo('\nUser agents (showing top {} of {}):'.format(
+        total_user_agents_to_display, len(a.user_agents)))
+
+    for res in a.user_agents[:total_user_agents_to_display]:
         click.echo('    {}: {}'.format(res[0], res[1]))
 
 
