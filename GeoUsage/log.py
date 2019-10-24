@@ -171,9 +171,6 @@ class OWSLogRecord(LogRecord):
         self.kvp = {}
         """keyword/value of request parameters and values"""
 
-        # [WMS] layer, layers; [WFS] typename; [WCS] coverageid
-        layer_keys = ['layer', 'layers', 'typename', 'coverageid']
-
         try:
             LogRecord.__init__(self, line)
         except (NotFoundError, ValueError):
@@ -190,45 +187,16 @@ class OWSLogRecord(LogRecord):
 
         LOGGER.debug('Splitting OWS request line')
 
-        _kvps = ''
-        if '?' in self.request:
-            self.baseurl, _kvps = self.request.split('?', 1)
-        else:
-            self.baseurl = self.request
-            msg = ('Log record has non OWS URL from this request: {}.\n'
-                   'Original log line: {}').format(self.request, line)
-            LOGGER.debug(msg)
-
-        for _kvp in _kvps.split('&'):
-            LOGGER.debug('keyword/value pair: {}'.format(_kvp))
-            if '=' in _kvp:
-                k, v = _kvp.split('=', 1)
-                self.kvp[unquote(k.lower())] = unquote(v)  # URL decoding
-
-        if 'service' in self.kvp:
-            self.service = self.kvp['service']
-        if 'version' in self.kvp:
-            self.version = self.kvp['version']
-        if 'request' in self.kvp:
-            self.ows_request = self.kvp['request']
-        if 'styles' in self.kvp:
-            self.styles = self.kvp['styles']
-
-        if 'crs' in self.kvp:  # WMS projection
-            self.crs = self.kvp['crs'].replace('%3A', ':')
-        elif 'subsettingcrs' in self.kvp:  # WCS projection
-            self.crs = self.kvp['subsettingcrs'].replace('%3A', ':')
-
-        if 'format' in self.kvp:  # WMS/WCS format
-            self.format = self.kvp['format']
-        if 'outputformat' in self.kvp:  # WFS format
-            self.format = self.kvp['outputformat']
-
-        # OWS resource from multiple request types
-        for layer_k in layer_keys:
-            if layer_k in self.kvp:
-                self.ows_resource = self.kvp[layer_k]
-                break
+        parsed_request = parseRequest(self.request)
+        self.baseurl = parsed_request['baseurl']
+        self.service = parsed_request['service']
+        self.version = parsed_request['version']
+        self.ows_request = parsed_request['ows_request']
+        self.styles = parsed_request['styles']
+        self.crs = parsed_request['crs']
+        self.format = parsed_request['format']
+        self.ows_resource = parsed_request['ows_resource']
+        self.kvp = parsed_request['kvp']
 
         if service_type is not None:
             if service_type in SERVICE_TYPES:
@@ -443,6 +411,66 @@ def dot2longip(ip):
         LOGGER.debug(msg)
 
     return ip_number
+
+
+def parseRequest(url_request):
+    """Parses the URL request and returns a dict of the parsed results"""
+
+    results = {
+        'baseurl': None,
+        'kvp': {},
+        'service': None,
+        'version': None,
+        'styles': None,
+        'crs': None,
+        'ows_resource': None,
+        'ows_request': None,
+        'format': None
+    }
+    _kvps = ''
+
+    if '?' in url_request:
+        results['baseurl'], _kvps = url_request.split('?', 1)
+    else:
+        results['baseurl'] = url_request
+        msg = ('Log record has non OWS URL from this request\
+            : {}.\n').format(url_request)
+        LOGGER.debug(msg)
+
+    for _kvp in _kvps.split('&'):
+        LOGGER.debug('keyword/value pair: {}'.format(_kvp))
+        if '=' in _kvp:
+            k, v = _kvp.split('=', 1)
+            results['kvp'][unquote(k.lower())] = unquote(v)  # URL decoding
+
+    if 'service' in results['kvp']:
+        results['service'] = results['kvp']['service']
+    if 'version' in results['kvp']:
+        results['version'] = results['kvp']['version']
+    if 'request' in results['kvp']:
+        results['ows_request'] = results['kvp']['request']
+    if 'styles' in results['kvp']:
+        results['styles'] = results['kvp']['styles']
+
+    if 'crs' in results['kvp']:  # WMS projection
+        results['crs'] = results['kvp']['crs'].replace('%3A', ':')
+    elif 'subsettingcrs' in results['kvp']:  # WCS projection
+        results['crs'] = results['kvp']['subsettingcrs'].replace('%3A', ':')
+
+    if 'format' in results['kvp']:  # WMS/WCS format
+        results['format'] = results['kvp']['format']
+    if 'outputformat' in results['kvp']:  # WFS format
+        results['format'] = results['kvp']['outputformat']
+
+    # OWS resource from multiple request types
+    # [WMS] layer, layers; [WFS] typename; [WCS] coverageid
+    layer_keys = ['layer', 'layers', 'typename', 'coverageid']
+    for layer_k in layer_keys:
+        if layer_k in results['kvp']:
+            results['ows_resource'] = results['kvp'][layer_k]
+            break
+
+    return results
 
 
 class NotFoundError(Exception):

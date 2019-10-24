@@ -37,7 +37,7 @@ except ImportError:
 
 
 from GeoUsage.log import (Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord,
-                          parse_iso8601, test_time, dot2longip)
+                          parse_iso8601, test_time, dot2longip, parseRequest)
 from GeoUsage.mailing_list import MailmanAdmin
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
@@ -196,6 +196,30 @@ class LogTest(unittest.TestCase):
         ip = None
         ip_number = dot2longip(ip)
         self.assertEqual(ip_number, 0)
+
+    def test_parseRequest(self):
+        """Test function that parses the URL request"""
+
+        sample_request = '/geomet?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&\
+BBOX=42.31394699888498678,-90.41354313244478647,44.89833987902360946,\
+-85.38917932723411752&CRS=EPSG:4326&WIDTH=1322&HEIGHT=680&LAYERS=RADAR_RDBS&\
+STYLES=&FORMAT=image/png&DPI=120&MAP_RESOLUTION=120&FORMAT_OPTIONS=dpi:120&\
+TRANSPARENT=TRUE'
+
+        results = parseRequest(sample_request)
+        self.assertEqual(results['baseurl'], '/geomet')
+        self.assertEqual(results['service'], 'WMS')
+        self.assertEqual(results['version'], '1.3.0')
+        self.assertEqual(results['styles'], '')
+        self.assertEqual(results['crs'], 'EPSG:4326')
+        self.assertEqual(results['format'], 'image/png')
+        self.assertEqual(len(results['kvp']), 14)
+        self.assertEqual(results['kvp']['request'], 'GetMap')
+        self.assertEqual(results['kvp']['width'], '1322')
+        self.assertEqual(results['kvp']['height'], '680')
+        self.assertEqual(results['kvp']['layers'], 'RADAR_RDBS')
+        self.assertEqual(results['kvp']['bbox'], '42.31394699888498678,\
+-90.41354313244478647,44.89833987902360946,-85.38917932723411752')
 
 
 class AnalyzerTest(unittest.TestCase):
