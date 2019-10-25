@@ -187,7 +187,7 @@ class OWSLogRecord(LogRecord):
 
         LOGGER.debug('Splitting OWS request line')
 
-        parsed_request = parseRequest(self.request)
+        parsed_request = parse_request(self.request)
         self.baseurl = parsed_request['baseurl']
         self.service = parsed_request['service']
         self.version = parsed_request['version']
@@ -413,7 +413,7 @@ def dot2longip(ip):
     return ip_number
 
 
-def parseRequest(url_request):
+def parse_request(url_request):
     """Parses the URL request and returns a dict of the parsed results"""
 
     results = {

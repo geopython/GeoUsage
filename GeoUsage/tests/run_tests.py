@@ -37,7 +37,7 @@ except ImportError:
 
 
 from GeoUsage.log import (Analyzer, NotFoundError, OWSLogRecord, WMSLogRecord,
-                          parse_iso8601, test_time, dot2longip, parseRequest)
+                          parse_iso8601, test_time, dot2longip, parse_request)
 from GeoUsage.mailing_list import MailmanAdmin
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
@@ -197,7 +197,7 @@ class LogTest(unittest.TestCase):
         ip_number = dot2longip(ip)
         self.assertEqual(ip_number, 0)
 
-    def test_parseRequest(self):
+    def test_parse_request(self):
         """Test function that parses the URL request"""
 
         sample_request = '/geomet?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&\
@@ -206,7 +206,7 @@ BBOX=42.31394699888498678,-90.41354313244478647,44.89833987902360946,\
 STYLES=&FORMAT=image/png&DPI=120&MAP_RESOLUTION=120&FORMAT_OPTIONS=dpi:120&\
 TRANSPARENT=TRUE'
 
-        results = parseRequest(sample_request)
+        results = parse_request(sample_request)
         self.assertEqual(results['baseurl'], '/geomet')
         self.assertEqual(results['service'], 'WMS')
         self.assertEqual(results['version'], '1.3.0')
