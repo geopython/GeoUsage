@@ -1,5 +1,5 @@
 # GeoUsage
-[![Build Status](https://travis-ci.org/geopython/GeoUsage.png)](https://travis-ci.org/geopython/GeoUsage)
+[![Build Status](https://github.com/geopython/GeoUsage/workflows/build%20%E2%9A%99%EF%B8%8F/badge.svg)](https://github.com/geopython/GeoUsage/actions)
 
 Metrics Analysis for OGC Web Services
 
