@@ -1,6 +1,5 @@
 # GeoUsage
 [![Build Status](https://travis-ci.org/geopython/GeoUsage.png)](https://travis-ci.org/geopython/GeoUsage)
-[![Coverage Status](https://coveralls.io/repos/github/geopython/GeoUsage/badge.svg?branch=master)](https://coveralls.io/github/geopython/GeoUsage?branch=master)
 
 Metrics Analysis for OGC Web Services
 
@@ -10,8 +9,7 @@ GeoUsage is a pure Python package providing OGC Web Services usage analysis.
 
 ## Installation
 
-The easiest way to install GeoUsage is via the Python [pip](https://pip.pypa.io/en/stable/)
-utility:
+The easiest way to install GeoUsage is via [pip](https://pip.pypa.io/en/stable/):
 
 ```bash
 pip install GeoUsage
@@ -37,15 +35,14 @@ install to a virtualenv, perform the following steps:
 
 ```bash
 # setup virtualenv
-virtualenv --system-site-packages -p python3 GeoUsage
+python3 -m venv GeoUsage
 cd GeoUsage
 source bin/activate
 
 # clone codebase and install
 git clone https://github.com/geopython/GeoUsage.git
 cd GeoUsage
-python setup.py build
-python setup.py install
+python3 setup.py install
 ```
 
 ## Running
@@ -98,7 +95,6 @@ from GeoUsage.mailman import MailmanAdmin
 
 ma = MailmanAdmin('http://example.org/mailman/admin/list', 'secret')
 print(ma.member_count)
-
 ```
 
 ## Development
@@ -110,10 +106,10 @@ print(ma.member_count)
 pip install -r requirements-dev.txt
 
 # run tests like this:
-python GeoUsage/tests/run_tests.py
+python3 GeoUsage/tests/run_tests.py
 
 # or this:
-python setup.py test
+python3 setup.py test
 
 # measure code coverage
 coverage run --source=GeoUsage -m unittest GeoUsage.tests.run_tests
@@ -123,7 +119,7 @@ coverage report -m
 ## Releasing
 
 ```bash
-python setup.py sdist bdist_wheel --universal
+python3 setup.py sdist bdist_wheel --universal
 twine upload dist/*
 ```
 
@@ -138,4 +134,3 @@ All bugs, enhancements and issues are managed on [GitHub](https://github.com/geo
 ## Contact
 
 * [Tom Kralidis](https://github.com/tomkralidis)
-

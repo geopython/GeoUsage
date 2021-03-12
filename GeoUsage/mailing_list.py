@@ -33,7 +33,7 @@ import requests
 LOGGER = logging.getLogger(__name__)
 
 
-class MailmanAdmin(object):
+class MailmanAdmin:
     """Mailman admin interface"""
     def __init__(self, admin_url, admin_password):
         """

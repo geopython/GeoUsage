@@ -26,11 +26,12 @@
 __version__ = '0.1.0'
 
 from datetime import datetime
-from urllib.parse import unquote
 import gzip
+import ipaddress
 import logging
 import socket
-import ipaddress
+from urllib.parse import unquote
+
 import click
 
 LOGGER = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ SERVICE_TYPES = {
 }
 
 
-class LogRecord(object):
+class LogRecord:
     """Generic Log Record"""
     def __init__(self, line):
         """
@@ -231,7 +232,7 @@ class WMSLogRecord(OWSLogRecord):
         return '<OWSLogRecord> {}'.format(self.request)
 
 
-class Analyzer(object):
+class Analyzer:
     """Log Analyzer"""
     def __init__(self, records=[], resolve_ips=False):
         """
