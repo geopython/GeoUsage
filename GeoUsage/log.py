@@ -38,7 +38,8 @@ LOGGER = logging.getLogger(__name__)
 
 SERVICE_TYPES = {
     'OGC:WMS': 'WMS',
-    'OGC:WFS': 'WFS'
+    'OGC:WFS': 'WFS',
+    'OGC:WPS': 'WPS'
 }
 
 
@@ -193,6 +194,7 @@ class OWSLogRecord(LogRecord):
         self.service = parsed_request['service']
         self.version = parsed_request['version']
         self.ows_request = parsed_request['ows_request']
+        self.identifier = parsed_request['identifier']
         self.styles = parsed_request['styles']
         self.crs = parsed_request['crs']
         self.format = parsed_request['format']
@@ -229,7 +231,33 @@ class WMSLogRecord(OWSLogRecord):
                               service_type='OGC:WMS')
 
     def __repr__(self):
-        return '<OWSLogRecord> {}'.format(self.request)
+        return '<WMSLogRecord> {}'.format(self.request)
+
+
+class WPSLogRecord(OWSLogRecord):
+    """OGC:WPS Log Record"""
+    def __init__(self, line, endpoint=None):
+        OWSLogRecord.__init__(self, line, endpoint=endpoint,
+                              service_type='OGC:WPS')
+        self.resource = 'identifier'
+        """WPS parameter to identify process"""
+
+        # Workaround: count POST requests as "Execute"
+        if self.request_type == 'POST':
+            self.ows_request = 'Execute'
+
+    def __repr__(self):
+        return '<WPSLogRecord> {}'.format(self.request)
+
+
+def get_record(line, endpoint=None, service_type=None):
+    if service_type == 'OGC:WMS':
+        r = WMSLogRecord(line, endpoint=endpoint)
+    if service_type == 'OGC:WPS':
+        r = WPSLogRecord(line, endpoint=endpoint)
+    else:
+        r = OWSLogRecord(line, endpoint=endpoint, service_type=service_type)
+    return r
 
 
 class Analyzer:
@@ -426,7 +454,8 @@ def parse_request(url_request):
         'crs': None,
         'ows_resource': None,
         'ows_request': None,
-        'format': None
+        'format': None,
+        'identifier': None,
     }
     _kvps = ''
 
@@ -462,6 +491,8 @@ def parse_request(url_request):
         results['format'] = results['kvp']['format']
     if 'outputformat' in results['kvp']:  # WFS format
         results['format'] = results['kvp']['outputformat']
+    if 'identifier' in results['kvp']:  # WPS identifier
+        results['identifier'] = results['kvp']['identifier']
 
     # OWS resource from multiple request types
     # [WMS] layer, layers; [WFS] typename; [WCS] coverageid
@@ -491,14 +522,14 @@ def log():
 
 @click.command()
 @click.pass_context
+@click.argument('logfile',
+                type=click.Path(exists=True, resolve_path=True, dir_okay=False),
+                nargs=-1)
 @click.option('--endpoint', '-e', help='OWS endpoint (base URL)')
-@click.option('--logfile', '-l',
-              type=click.Path(exists=True, resolve_path=True),
-              help='logfile to parse')
 @click.option('--resolve-ips', '-r', 'resolve_ips', default=False,
               is_flag=True, help='resolve IP addresses')
 @click.option('--service-type', '-s', 'service_type',
-              type=click.Choice(['OGC:WMS', 'OGC:WCS']), default='OGC:WMS',
+              type=click.Choice(['OGC:WMS', 'OGC:WCS', 'OGC:WPS']), default='OGC:WMS',
               help='service type')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
@@ -524,24 +555,25 @@ def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
     if time_ is not None:
         time__ = parse_iso8601(time_)
 
-    if logfile.endswith('gz'):
-        open_ = gzip.open
-    else:
-        open_ = open
-    with open_(logfile, 'rt') as ff:
-        for line in ff.readlines():
-            try:
-                r = WMSLogRecord(line, endpoint=endpoint)
-                if time_ is not None:
-                    if test_time(r.datetime, time__):
-                        LOGGER.debug('Adding line based on time filter')
-                        records.append(r)
+    for logfile_ in logfile:
+        if logfile_.endswith('gz'):
+            open_ = gzip.open
+        else:
+            open_ = open
+        with open_(logfile_, 'rt') as ff:
+            for line in ff.readlines():
+                try:
+                    r = get_record(line, endpoint=endpoint, service_type=service_type)
+                    if time_ is not None:
+                        if test_time(r.datetime, time__):
+                            LOGGER.debug('Adding line based on time filter')
+                            records.append(r)
+                        else:
+                            LOGGER.debug('Skipping line based on time filter')
                     else:
-                        LOGGER.debug('Skipping line based on time filter')
-                else:
-                    records.append(r)
-            except NotFoundError:
-                pass
+                        records.append(r)
+                except NotFoundError:
+                    pass
 
     if len(records) == 0:
         raise click.ClickException('No records to analyze')
@@ -566,7 +598,7 @@ def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
 
     click.echo('\nGeoUsage Analysis')
     click.echo('=================\n')
-    click.echo('Logfile: {}\n'.format(logfile))
+    click.echo('Logfile: {}\n'.format(', '.join(logfile)))
     click.echo('Period: {} - {}\n'.format(a.start.isoformat(),
                                           a.end.isoformat()))
     click.echo('Total bytes transferred: {}\n'.format(a.total_size))
