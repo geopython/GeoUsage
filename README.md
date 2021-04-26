@@ -58,34 +58,41 @@ GeoUsage --help
 GeoUsage --version
 
 # perform WMS analysis on an Apache logfile on any WMS endpoint
-GeoUsage log analyze --service-type=OGC:WMS --logfile </path/to/apache_logfile>
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS
 
 # perform WMS analysis on an Apache logfile on a specific WMS endpoint
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile>
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows
 
 # perform WMS analysis on an Apache logfile for a single date
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --time=2018-01-26
 
 # perform WMS analysis on an Apache logfile for a date range
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26/2018-01-27
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --time=2018-01-26/2018-01-27
 
 # perform WMS analysis on an Apache logfile for a single datetime
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --time=2018-01-26T11:11:11
 
 # perform WMS analysis on an Apache logfile for a datetime range
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --time=2018-01-26T11:11:11/2018-01-27T12:32:11
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --time=2018-01-26T11:11:11/2018-01-27T12:32:11
 
 # resolve IP addresses
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO --resolve-ips
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --verbosity=INFO --resolve-ips
 
 # show top 10 unique IPs and top 10 layers
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO --resolve-ips --top=10
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --verbosity=INFO --resolve-ips --top=10
 
 # add verbose mode
-GeoUsage log analyze --service-type=OGC:WMS --endpoint=/ows --logfile </path/to/apache_logfile> --verbosity=INFO
+GeoUsage log analyze </path/to/apache_logfile> --service-type=OGC:WMS --endpoint=/ows --verbosity=INFO
 
 # query a Mailman mailing list member count
 GeoUsage mailing_list member_count
+```
+
+### Example
+
+Analyse OGC:WPS service using nginx log files:
+```
+GeoUsage log analyze /var/log/nginx/access.log* --service-type=OGC:WPS --endpoint=/wps
 ```
 
 ### Using the API
