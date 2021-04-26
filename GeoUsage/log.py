@@ -523,13 +523,16 @@ def log():
 @click.command()
 @click.pass_context
 @click.argument('logfile',
-                type=click.Path(exists=True, resolve_path=True, dir_okay=False),
+                type=click.Path(exists=True,
+                                resolve_path=True,
+                                dir_okay=False),
                 nargs=-1)
 @click.option('--endpoint', '-e', help='OWS endpoint (base URL)')
 @click.option('--resolve-ips', '-r', 'resolve_ips', default=False,
               is_flag=True, help='resolve IP addresses')
 @click.option('--service-type', '-s', 'service_type',
-              type=click.Choice(['OGC:WMS', 'OGC:WCS', 'OGC:WPS']), default='OGC:WMS',
+              type=click.Choice(['OGC:WMS', 'OGC:WCS', 'OGC:WPS']),
+              default='OGC:WMS',
               help='service type')
 @click.option('--time', '-t', 'time_',
               help='time filter (ISO8601 instance or start/end)')
@@ -563,7 +566,8 @@ def analyze(ctx, logfile, endpoint, verbosity, top, resolve_ips,
         with open_(logfile_, 'rt') as ff:
             for line in ff.readlines():
                 try:
-                    r = get_record(line, endpoint=endpoint, service_type=service_type)
+                    r = get_record(line, endpoint=endpoint,
+                                   service_type=service_type)
                     if time_ is not None:
                         if test_time(r.datetime, time__):
                             LOGGER.debug('Adding line based on time filter')
